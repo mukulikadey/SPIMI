@@ -10,6 +10,7 @@ import json
 import bm25Score
 import operator
 import functools
+import os
 
 k1 = 1.5
 b = 0.8
@@ -34,7 +35,7 @@ def read_spimi_index():
 
 def singleQuery(queryInput):
     spimi_index = read_spimi_index()
-    print('SPIMI INDEX: ',spimi_index)
+
     if len(queryInput.strip().split()) == 1:
         print('--- Single Keyword Query')
         single_keyword = queryInput.strip().split()[0]
@@ -43,7 +44,7 @@ def singleQuery(queryInput):
 
         scores = {}
 
-        if keyword in spimi_index:
+        if keyword in spimi_index.keys():
             hits = spimi_index[keyword]
 
             dft = len(hits.keys())
@@ -61,7 +62,8 @@ def singleQuery(queryInput):
                 sorted_scores = sorted(scores.items(), key=operator.itemgetter(1), reverse=True)
 
             print('Number of hits: ', len(scores.keys()))
-            print('Hits: ', sorted_scores)
+            print('Matches: ', hits)
+            print('Scores: ', sorted_scores)
         else:
             print('No documents found!')
 

@@ -63,7 +63,7 @@ def sort_terms(dictionary):
 
 
 def write_block_to_disk(sorted_dictionary, block_number):
-    block_path_parts = ['DISK/', 'BLOCK', str(block_number), '.txt']
+    block_path_parts = ['DISK/', 'BLOCK', str(block_number).zfill(3), '.txt']
     block_path = ''.join(block_path_parts)
 
     if not os.path.exists('DISK/'):
