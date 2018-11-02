@@ -77,7 +77,7 @@ def multiAndQuery(queryInput):
     scores = dict()
 
     # normalize the user query
-    query_terms = queryInput.strip().replace(" ", "").split("&&")
+    query_terms = queryInput.strip().split(" ")
     print('--- Multiple Keyword Query')
     terms = preprocessing.normalize(query_terms)
     print('--- Terms:', query_terms)
@@ -119,7 +119,7 @@ def multiOrQuery(queryInput):
     scores = dict()
 
     # normalize the user query
-    query_terms = queryInput.strip().replace(" ", "").split("||")
+    query_terms = queryInput.strip().split(" ")
     print('--- Multiple Keyword Query')
     terms = preprocessing.normalize(query_terms)
     print('--- Terms:', query_terms)

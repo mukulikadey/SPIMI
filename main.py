@@ -3,7 +3,7 @@ import preprocessing
 import json
 from spimi import SPIMI
 
-def ranking(documents):
+def dump_bm25_param(documents):
     num_documents = len(documents.keys())
     doc_len = {}
     sum_len = 0
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     documents = reuters.getDocuments()
     print("=============== Preprocessing documents ===========")
     documents = preprocessing.preprocess(documents)
-    ranking(documents)
+    dump_bm25_param(documents)
     print("=============== Applying SPIMI Algorithm ==========")
     spimi = SPIMI(block_size_limit, documents)
     spimi.invert()
