@@ -1,76 +1,71 @@
 import preprocessing
-import reuters
 from glob import iglob
 from collections import OrderedDict
-import ast
 import collections
-import itertools
-import re
 import json
 import bm25Score
 import operator
-import functools
-import os
 
+# constants for calculating the BM25 score
 k1 = 1.5
 b = 0.8
 
 # ===============READ SPIMI INDEX==================
 
 def read_spimi_index():
-    index = OrderedDict()
-    files_paths = []
+    spimi_index = OrderedDict()
+    files = []
 
-    for file_path in iglob('DISK/BLOCK*.txt'):
-        files_paths.append(file_path)
+    for file in iglob('DISK/BLOCK*.txt'):
+        files.append(file)
 
-    for file in files_paths:
-        with open(file, 'r') as file:
-            block_object = json.load(file)
+    for file in files:
+        with open(file, 'r') as f:
+            block = json.load(f)
 
-            # Check if any of these items were already added to the index
-            # If so, concatenate the values of the new item with what's already in the dict
-            for key, value in block_object.items():
-                if key in index.keys():
-                    index[key].update(value)
+            # Check if any of these items were already added to the spimi_index
+            # If so, concatenate the values of the new item with what's already in the dictionary
+            for key, value in block.items():
+                if key in spimi_index.keys():
+                    spimi_index[key].update(value)
                 else:
-                    index[key] = value
+                    spimi_index[key] = value
 
-    return index
+    return spimi_index
 
 # ===============SINGLE QUERY==================
 
 def singleQuery(queryInput):
     spimi_index = read_spimi_index()
 
+    # normalize the user query
     if len(queryInput.strip().split()) == 1:
         print('--- Single Keyword Query')
         single_keyword = queryInput.strip().split()[0]
         single_keyword_normalized = preprocessing.normalize([single_keyword])
         keyword = single_keyword_normalized[0]
 
-        scores = {}
+        bm25_scores = dict()
 
+        # check if single keyword exists in spimi_index keys
         if keyword in spimi_index.keys():
-            hits = spimi_index[keyword]
+            matches = spimi_index[keyword]
+            doc_freq = len(matches.keys())
 
-            dft = len(hits.keys()) # document frequency
-
-            for docid, tftd in hits.items():
+            for doc_id, term_freq in matches.items():
                 query_parameters = {
                     keyword: {
-                        'dft': dft,
-                        'tftd': tftd,
-                        'docid': docid
+                        'doc_freq': doc_freq,
+                        'term_freq': term_freq,
+                        'doc_id': doc_id
                     }
                 }
 
-                scores[docid] = bm25Score.get_score(query_parameters, k1, b)
-                sorted_scores = sorted(scores.items(), key=operator.itemgetter(1), reverse=True)
+                # calculate the bm25 score for each document
+                bm25_scores[doc_id] = bm25Score.calculate_score(query_parameters, k1, b)
+                sorted_scores = sorted(bm25_scores.items(), key=operator.itemgetter(1), reverse=True)
 
-            print('Number of hits: ', len(scores.keys()))
-            print('Matches: ', hits)
-            print('Scores: ', sorted_scores)
+            print('Matches: ', sorted_scores)
         else:
             print('No documents found!')
 
@@ -78,16 +73,16 @@ def singleQuery(queryInput):
 
 def multiAndQuery(queryInput):
     spimi_index = read_spimi_index()
-    tmpDict = {}
-    tmpList = []
     union_list = []
+    scores = dict()
 
+    # normalize the user query
     query_terms = queryInput.strip().replace(" ", "").split("&&")
     print('--- Multiple Keyword Query')
     terms = preprocessing.normalize(query_terms)
     print('--- Terms:', query_terms)
 
-    # add to temp dict
+    # append postings lists for each term to union_list
     for term in terms:
         union_list.extend(spimi_index[term])
 
@@ -95,90 +90,74 @@ def multiAndQuery(queryInput):
     doc_id_intersection = [item for item, count in collections.Counter(union_list).items() if count == len(terms)]
 
     doc_freq = len(doc_id_intersection)
-    scores = dict()
+
     for term in terms:
-        for docid in doc_id_intersection:
+        for doc_id in doc_id_intersection:
             query_parameters = {
                 term: {
-                    'dft': doc_freq,
-                    'tftd': spimi_index[term][docid],
-                    'docid': docid
+                    'doc_freq': doc_freq,
+                    'term_freq': spimi_index[term][doc_id],
+                    'doc_id': doc_id
                 }
             }
 
-            scores[docid] = bm25Score.get_score(query_parameters, k1, b)
+            # calculate the bm25 score for each document
+            scores[doc_id] = bm25Score.calculate_score(query_parameters, k1, b)
             sorted_scores = sorted(scores.items(), key=operator.itemgetter(1), reverse=True)
 
     if (len(doc_id_intersection) == 0):
         print("No documents found")
     else:
-        print('Number of hits: ', len(scores.keys()))
-        print('Matches: ', doc_id_intersection)
-        print('Scores: ', sorted_scores)
+        print('Matches: ', sorted_scores)
 
 
 # ===============UNION==================
 
 def multiOrQuery(queryInput):
     spimi_index = read_spimi_index()
-    tmpDict = {}
-    tmpList = []
     union_list = []
+    scores = dict()
 
+    # normalize the user query
     query_terms = queryInput.strip().replace(" ", "").split("||")
     print('--- Multiple Keyword Query')
     terms = preprocessing.normalize(query_terms)
     print('--- Terms:', query_terms)
 
-    # add to temp dict
+    # append postings lists for each term to union_list
     for term in terms:
         union_list.extend(spimi_index[term].keys())
 
-    # find duplicate items in union list
+    # return the set of union_list (no duplicates) as a list
     doc_id_union = list(set(union_list))
 
     doc_freq = len(doc_id_union)
-    scores = dict()
+
     for term in terms:
-        for docid in doc_id_union:
+        for doc_id in doc_id_union:
             # Ensure term frequency is zero, if it is not in this document
-            if docid in spimi_index[term]:
-                tftd = spimi_index[term][docid]
+            if doc_id in spimi_index[term]:
+                term_freq = spimi_index[term][doc_id]
             else:
-                tftd = 0
+                term_freq = 0
 
             query_parameters = {
                 term: {
-                    'dft': doc_freq,
-                    'tftd': tftd,
-                    'docid': docid
+                    'doc_freq': doc_freq,
+                    'term_freq': term_freq,
+                    'doc_id': doc_id
                 }
             }
 
-            scores[docid] = bm25Score.get_score(query_parameters, k1, b)
+            # calculate the bm25 score for each document
+            scores[doc_id] = bm25Score.calculate_score(query_parameters, k1, b)
             sorted_scores = sorted(scores.items(), key=operator.itemgetter(1), reverse=True)
 
     if (len(doc_id_union) == 0):
         print("No documents found")
     else:
-        print('Number of hits: ', len(scores.keys()))
-        print('Matches: ', doc_id_union)
-        print('Scores: ', sorted_scores)
+        print('Matches: ', sorted_scores)
 
-
-def remove_duplicates(values):
-    val_set=set(values)
-
-    return list(val_set)
-    # output = []
-    # seen = set()
-    # for value in values:
-    #     # If value has not been encountered yet,
-    #     # ... add it to both list and set.
-    #     if value not in seen:
-    #         output.append(value)
-    #         seen.add(value)
-    # return output
 
 # ===============MAIN METHOD==================
 

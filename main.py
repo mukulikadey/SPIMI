@@ -1,28 +1,24 @@
-import spimi
 import reuters
 import preprocessing
-from glob import iglob
 import json
 from spimi import SPIMI
 
 def ranking(documents):
-
     num_documents = len(documents.keys())
-
     doc_len = {}
     sum_len = 0
 
-    for docId, token_list in documents.items():
-        length = len(token_list)
+    for docId, postings_list in documents.items():
+        length = len(postings_list)
         doc_len[docId] = length
         sum_len += length
 
     avg_len = sum_len / num_documents
 
     bm25_param = {
-        'N': num_documents,
-        'Ld': doc_len,
-        'Lave': avg_len
+        'num_documents': num_documents,
+        'doc_len': doc_len,
+        'avg_len': avg_len
     }
 
     with open('bm25_param.txt', 'w') as f:
