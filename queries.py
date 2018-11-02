@@ -27,7 +27,14 @@ def read_spimi_index():
     for file in files_paths:
         with open(file, 'r') as file:
             block_object = json.load(file)
-            index.update(block_object)
+
+            # Check if any of these items were already added to the index
+            # If so, concatenate the values of the new item with what's already in the dict
+            for key, value in block_object.items():
+                if key in index.keys():
+                    index[key].update(value)
+                else:
+                    index[key] = value
 
     return index
 
@@ -47,7 +54,7 @@ def singleQuery(queryInput):
         if keyword in spimi_index.keys():
             hits = spimi_index[keyword]
 
-            dft = len(hits.keys())
+            dft = len(hits.keys()) # document frequency
 
             for docid, tftd in hits.items():
                 query_parameters = {
@@ -69,43 +76,45 @@ def singleQuery(queryInput):
 
 # ===============INTERSECTION==================
 
-def intersect(a, b):
-    return a.intersection(b)
-
 def multiAndQuery(queryInput):
     spimi_index = read_spimi_index()
     tmpDict = {}
     tmpList = []
     union_list = []
 
-    query_terms = queryInput.strip().replace(" ", "").split("and")
+    query_terms = queryInput.strip().replace(" ", "").split("&&")
     print('--- Multiple Keyword Query')
     terms = preprocessing.normalize(query_terms)
     print('--- Terms:', query_terms)
 
     # add to temp dict
     for term in terms:
-        if term in spimi_index.keys():
-            tmpDict[term] = spimi_index[term]
-        else:
-            tmpDict[term] = []
-
-    # add to temp list
-    for key, value in tmpDict.items():
-        tmpList.append(value)
-
-    # add to union list
-    for i in range(len(tmpList)):
-        for j in range(len(tmpList[i])):
-            union_list.append(tmpList[i][j])
+        union_list.extend(spimi_index[term])
 
     # find duplicate items in union list
-    dup_items = [item for item, count in collections.Counter(union_list).items() if count > 1]
+    doc_id_intersection = [item for item, count in collections.Counter(union_list).items() if count == len(terms)]
 
-    if (len(dup_items) == 0):
+    doc_freq = len(doc_id_intersection)
+    scores = dict()
+    for term in terms:
+        for docid in doc_id_intersection:
+            query_parameters = {
+                term: {
+                    'dft': doc_freq,
+                    'tftd': spimi_index[term][docid],
+                    'docid': docid
+                }
+            }
+
+            scores[docid] = bm25Score.get_score(query_parameters, k1, b)
+            sorted_scores = sorted(scores.items(), key=operator.itemgetter(1), reverse=True)
+
+    if (len(doc_id_intersection) == 0):
         print("No documents found")
     else:
-        print("Intersecting PL: ", dup_items)
+        print('Number of hits: ', len(scores.keys()))
+        print('Matches: ', doc_id_intersection)
+        print('Scores: ', sorted_scores)
 
 
 # ===============UNION==================
@@ -116,46 +125,60 @@ def multiOrQuery(queryInput):
     tmpList = []
     union_list = []
 
-    query_terms = queryInput.strip().replace(" ", "").split("or")
+    query_terms = queryInput.strip().replace(" ", "").split("||")
     print('--- Multiple Keyword Query')
     terms = preprocessing.normalize(query_terms)
     print('--- Terms:', query_terms)
 
     # add to temp dict
     for term in terms:
-        if term in spimi_index.keys():
-            tmpDict[term] = spimi_index[term]
+        union_list.extend(spimi_index[term].keys())
 
-        else:
-            tmpDict[term] = []
+    # find duplicate items in union list
+    doc_id_union = list(set(union_list))
 
-    # add to temp list
-    for key, value in tmpDict.items():
-        tmpList.append(value)
+    doc_freq = len(doc_id_union)
+    scores = dict()
+    for term in terms:
+        for docid in doc_id_union:
+            # Ensure term frequency is zero, if it is not in this document
+            if docid in spimi_index[term]:
+                tftd = spimi_index[term][docid]
+            else:
+                tftd = 0
 
-    # add to union list
-    for i in range(len(tmpList)):
-        for j in range(len(tmpList[i])):
-            union_list.append(tmpList[i][j])
+            query_parameters = {
+                term: {
+                    'dft': doc_freq,
+                    'tftd': tftd,
+                    'docid': docid
+                }
+            }
 
-    # remove duplicates from union list
-    result = remove_duplicates(union_list)
+            scores[docid] = bm25Score.get_score(query_parameters, k1, b)
+            sorted_scores = sorted(scores.items(), key=operator.itemgetter(1), reverse=True)
 
-    if (len(result) == 0):
+    if (len(doc_id_union) == 0):
         print("No documents found")
     else:
-        print("Union PL: ", result)
+        print('Number of hits: ', len(scores.keys()))
+        print('Matches: ', doc_id_union)
+        print('Scores: ', sorted_scores)
+
 
 def remove_duplicates(values):
-    output = []
-    seen = set()
-    for value in values:
-        # If value has not been encountered yet,
-        # ... add it to both list and set.
-        if value not in seen:
-            output.append(value)
-            seen.add(value)
-    return output
+    val_set=set(values)
+
+    return list(val_set)
+    # output = []
+    # seen = set()
+    # for value in values:
+    #     # If value has not been encountered yet,
+    #     # ... add it to both list and set.
+    #     if value not in seen:
+    #         output.append(value)
+    #         seen.add(value)
+    # return output
 
 # ===============MAIN METHOD==================
 
