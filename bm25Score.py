@@ -20,3 +20,4 @@ def calculate_score(query_params, k1, b):
         bm25_score += (math.log(num_documents / doc_freq))*(((k1 + 1) * term_freq) / (k1 * ((1-b) + b * (doc_len[doc_id] / avg_len)) + term_freq))
 
     return bm25_score
+

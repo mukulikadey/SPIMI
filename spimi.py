@@ -24,8 +24,10 @@ class SPIMI:
 
                 # calculating the term frequency
                 if docId not in postings_list.keys():
+                    # if docID is encountered for the first time, we set the frequency counter to 1
                     postings_list[docId] = 1
                 else:
+                    # if docId is encountered again, we increment our frequency counter
                     postings_list[docId] += 1
 
 

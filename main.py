@@ -8,8 +8,8 @@ def dump_bm25_param(documents):
     doc_len = {}
     sum_len = 0
 
-    for docId, postings_list in documents.items():
-        length = len(postings_list)
+    for docId, terms_list in documents.items():
+        length = len(terms_list)
         doc_len[docId] = length
         sum_len += length
 
